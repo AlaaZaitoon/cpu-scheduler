@@ -120,7 +120,7 @@
         let quantum = document.getElementById("quantum").value;
 
         try {
-            let response = await fetch(`http://localhost:8080/api/solve?algo=${algo}&quantum=${quantum}`, {
+            let response = await fetch(`/api/solve?algo=${algo}&quantum=${quantum}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(processes)
