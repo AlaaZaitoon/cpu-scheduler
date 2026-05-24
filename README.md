@@ -2,6 +2,8 @@
 
 A high-performance **CPU Scheduling Simulator** designed using **Java Spring Boot (Java 25)** on the backend and a premium, responsive **Vanilla HTML/CSS/JS** interface on the frontend. 
 
+🔗 **Live Deployment Link:** **[https://cpu-scheduler-9c10.onrender.com/](https://cpu-scheduler-9c10.onrender.com/)**
+
 It simulates various CPU scheduling algorithms, visualizes execution sequences using an interactive **Gantt Chart**, and calculates key performance metrics such as **Completion Time (CT)**, **Turnaround Time (TAT)**, and **Waiting Time (WT)**.
 
 ---
