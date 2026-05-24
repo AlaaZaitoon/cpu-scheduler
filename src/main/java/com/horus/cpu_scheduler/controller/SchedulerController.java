@@ -14,6 +14,11 @@ public class SchedulerController {
     @Autowired
     private SchedulerService service;
 
+    @GetMapping("/ping")
+    public String ping() {
+        return "UP";
+    }
+
     @PostMapping("/solve")
     public SchedulingResult solve(
             @RequestBody List<ProcessData> processes,
