@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Java CPU Scheduler</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; padding: 20px; background: #f4f4f9; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #333; }
+
+        .controls { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        input, select, button { padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+        button { background: #28a745; color: white; cursor: pointer; border: none; }
+        button:hover { background: #218838; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th { background: #007bff; color: white; }
+
+        /* Gantt Chart Styles */
+        .gantt-container { display: flex; margin-top: 20px; border: 1px solid #333; height: 50px; border-radius: 5px; overflow: hidden; }
+        .gantt-block { display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; position: relative; transition: width 0.5s; }
+        .time-label { position: absolute; bottom: -20px; right: 0; color: black; font-size: 12px; }
+        .start-label { position: absolute; bottom: -20px; left: 0; color: black; font-size: 12px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>CPU Scheduling Simulator</h1>
+
+    <div class="controls">
+        <input type="number" id="at" placeholder="Arrival Time">
+        <input type="number" id="bt" placeholder="Burst Time">
+        <input type="number" id="pr" placeholder="Priority (Low=High)">
+        <button onclick="addProcess()">Add Process</button>
+
+        <select id="algo">
+            <option value="FCFS">FCFS</option>
+            <option value="SJF_NP">SJF (Non-Preemptive)</option>
+            <option value="PRIORITY_NP">Priority (Non-Preemptive)</option>
+            <option value="PRIORITY_PREEMPT">Priority (Preemptive)</option>
+            <option value="RR">Round Robin</option>
+        </select>
+        <input type="number" id="quantum" placeholder="Quantum (for RR)" value="2" style="width: 60px;">
+        <button onclick="solve()" style="background: #007bff;">Run Simulation</button>
+        <button onclick="clearAll()" style="background: #dc3545;">Reset</button>
+    </div>
+
+    <h3>Input Processes:</h3>
+    <ul id="processList"></ul>
+
+    <div id="resultsArea" style="display:none;">
+        <h3>Gantt Chart:</h3>
+        <div id="ganttChart" class="gantt-container"></div>
+        <div style="height: 20px;"></div> <h3>Result Table:</h3>
+        <table id="resultTable">
+            <thead>
+            <tr>
+                <th>PID</th><th>Arrival</th><th>Burst</th><th>Priority</th>
+                <th>Completion</th><th>Turnaround</th><th>Waiting</th>
+            </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        <p id="averages" style="font-weight: bold; margin-top: 10px;"></p>
+    </div>
+</div>
+
+<script>
+    // Initial default values for testing
+    let processes = [
+        { id: 1, at: 0, bt: 8, pr: 3 },
+        { id: 2, at: 1, bt: 4, pr: 1 },
+        { id: 3, at: 2, bt: 9, pr: 4 },
+        { id: 4, at: 3, bt: 5, pr: 2 }
+    ];
+    let pidCounter = 5;
+    const colors = ['#e74c3c', '#3498db', '#9b59b6', '#2ecc71', '#f1c40f', '#34495e'];
+
+    function renderProcessList() {
+        let listEl = document.getElementById("processList");
+        listEl.innerHTML = "";
+        processes.forEach(p => {
+            let li = document.createElement("li");
+            li.innerText = `P${p.id} [AT:${p.at}, BT:${p.bt}, PR:${p.pr}]`;
+            listEl.appendChild(li);
+        });
+    }
+
+    // Render initial values on load
+    window.onload = function() {
+        renderProcessList();
+    };
+
+    function addProcess() {
+        let at = document.getElementById('at').value;
+        let bt = document.getElementById('bt').value;
+        let pr = document.getElementById('pr').value || 0;
+
+        if(at === '' || bt === '') return alert("Enter AT and BT");
+
+        let p = { id: pidCounter++, at: parseInt(at), bt: parseInt(bt), pr: parseInt(pr) };
+        processes.push(p);
+        renderProcessList();
+    }
+
+    function clearAll() {
+        processes = [];
+        pidCounter = 1;
+        renderProcessList();
+        document.getElementById("resultsArea").style.display = "none";
+    }
+
+    async function solve() {
+        if(processes.length === 0) return alert("No processes added!");
+
+        let algo = document.getElementById("algo").value;
+        let quantum = document.getElementById("quantum").value;
+
+        try {
+            let response = await fetch(`http://localhost:8080/api/solve?algo=${algo}&quantum=${quantum}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(processes)
+            });
+
+            if(!response.ok) throw new Error("Server Error");
+
+            let data = await response.json();
+            renderResults(data);
+
+        } catch (e) {
+            alert("Error connecting to Java backend. Is it running?");
+            console.error(e);
+        }
+    }
+
+    function renderResults(data) {
+        document.getElementById("resultsArea").style.display = "block";
+
+        // 1. Fill Table
+        let tbody = document.querySelector("#resultTable tbody");
+        tbody.innerHTML = "";
+        data.processes.forEach(p => {
+            tbody.innerHTML += `
+                <tr>
+                    <td>P${p.id}</td><td>${p.at}</td><td>${p.bt}</td><td>${p.pr}</td>
+                    <td>${p.ct}</td><td>${p.turnAroundTime}</td><td>${p.waitingTime}</td>
+                </tr>`;
+        });
+
+        document.getElementById("averages").innerHTML =
+            `Avg Waiting: ${data.avgWaiting.toFixed(2)} | Avg Turnaround: ${data.avgTurnaround.toFixed(2)}`;
+
+        // 2. Draw Gantt Chart
+        let gantt = document.getElementById("ganttChart");
+        gantt.innerHTML = "";
+        let totalDuration = data.ganttChart[data.ganttChart.length-1].end;
+
+        data.ganttChart.forEach((seg, index) => {
+            let duration = seg.end - seg.start;
+            let percent = (duration / totalDuration) * 100;
+            let color = seg.pid === -1 ? '#ccc' : colors[(seg.pid - 1) % colors.length];
+            let label = seg.pid === -1 ? 'Idle' : `P${seg.pid}`;
+
+            let div = document.createElement("div");
+            div.className = "gantt-block";
+            div.style.width = percent + "%";
+            div.style.backgroundColor = color;
+            div.innerText = label;
+
+            // Time Labels
+            if(index === 0) div.innerHTML += `<span class="start-label">${seg.start}</span>`;
+            div.innerHTML += `<span class="time-label">${seg.end}</span>`;
+
+            gantt.appendChild(div);
+        });
+    }
+</script>
+
+</body>
+</html>
